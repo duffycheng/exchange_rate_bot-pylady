@@ -82,6 +82,13 @@ class MyLineBot:
         msg = msg.strip().replace(' ','')
         default_msg = "請輸入你想查詢的幣別（目前支援的有 %s）\n或請輸入你想被通知的幣別（範例1： 美元大於30通知我, 範例2： 日圓小於0.27通知我）" % (",".join(self.currency_name_mapping.values()))
 
+        # ** --- 嘗試增加一個取消通知的功能 ---
+        # HERE ->
+        #
+        # 這題沒有提示，全部讓你們自由發揮
+        #
+        # HERE <-
+
         # --- 通知功能 ----
         if re.match(".*通知", msg):
             match_obj = re.match("(\w+)(大於|小於)(\d+\.?\d*).*通知", msg)
