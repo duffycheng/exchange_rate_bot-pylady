@@ -42,6 +42,6 @@ class GoogleExchangeRateCrawler(Crawler):
             r = requests.get("https://www.google.com/finance/converter?a=1&from=%s&to=%s" % (currency, 'TWD'))
             match_obj = re.search("<span class=bld>(\d+\.?\d*) [A-Z]{3}<\/span>", r.text)
             if match_obj:
-                ret[currency] = match_obj.group(1)
+                ret[currency] = round(float(match_obj.group(1)), 4)
             time.sleep(0.2)
         return ret
