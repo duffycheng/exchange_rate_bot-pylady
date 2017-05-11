@@ -94,7 +94,7 @@ class MyLineBot:
                         updown = "down"
                     value = round(float(match_obj.group(3)), 4)
                     self.add_request_to_notify_list(uid, currency, updown, value)
-                    return match_obj.group(0) + '你'
+                    return "已確認，%s你" % (match_obj.group(0))
                 except Exception as e:
                     traceback.print_exc()
                     
