@@ -15,37 +15,64 @@ class MyLineBot:
     # 使用哪些爬蟲
     crawlers = (ITERExchangeRateCrawler, GoogleExchangeRateCrawler)
     # 暫存資料
+    # exchange_rate_table 格式如下： {'SGD': '21.4240', 'THB': '0.8694', 'CHF': '29.9822', 'NZD': '20.6702', 'HKD': '3.8854', 'GBP': '39.1246', 'ZAR': '2.2403', 'SEK': '3.3882', 'JPY': '0.2648', 'USD': '30.2550', 'EUR': '32.8758', 'CNY': '4.3825', 'CAD': '22.0670', 'AUD': '22.2553'}
     exchange_rate_table = {}
+    # notify_list 格式自訂
     notify_list = {}
     table_update_timestamp = str(datetime.utcnow())+'(UTC)'
 
     def __init__(self, options={}):
+        # **
         self.push_callback = options.get('push_callback', None)
+        self.exchange_rate_table = options.get('exchange_rate_table', {})
 
-    # ---- 通知使用者 ----
+    # ---- ** 通知使用者 ----
     def notify_user(self, uid, msg):
         print("notify_user '%s' '%s'" % (uid, msg))
         if self.push_callback:
             self.push_callback([uid], msg)
 
-    # ---- 新增通知名單 ----
+    # ---- ** 新增通知名單 ----
     def add_request_to_notify_list(self, uid, currency, updown, value):
-        self.notify_list[uid+currency] = (uid, currency, updown, value)
+        # HERE! ->
+        #
+        # 當一位使用者 "ab123" 的通知需求為 '當美元大於35.0元的時候請記得通知該使用者''
+        # 我們預期會得到以下的參數：
+        #
+        # (uid, currency, updown, value) -> (ab123, 美元, 大於, 35.0)
+        # 
+        # 請利用 self.notify_list 將參數記錄下來
+        #
+        # 另外，我們要如何避免 使用者重複記錄同一種幣別通知?
+        #
+        #     例如 
+        #     add_request_to_notify_list( ab123, 美元, 大於, 35.0)
+        #     add_request_to_notify_list( ab123, 美元, 大於, 25.0)
+        #
+        # 記錄了兩次 USD 的通知請求，我們該如何只保留最後一筆資料?
+        #
+        pass
+        #
+        # HERE! <-
+
+
+    # ---- ** 檢查通知名單 ----
+    def check_notify_list(self):
+        # HERE! ->
+        #
+        # 當我們取得最新匯率表的時候，按照 self.notify_list 裡面的參數 決定是否要通知使用者
+        #
+        # 請使用 self.notify_user() 將訊息傳遞給使用者，例如
+        #
+        #     self.notify_user("ab123", "你好，......")
+        #
+        pass
+        #
+        # HERE! <-
 
     # ---- 取得通知名單 ----
     def get_notify_list(self):
         return self.notify_list
-
-    # ---- 檢查通知名單 ----
-    def check_notify_list(self):
-        for uid, currency, updown, value in self.notify_list.values():
-            cur_value = self.exchange_rate_table.get(currency, 0)
-            if cur_value == 0:
-                continue
-            elif updown == 'up' and cur_value > value:
-                self.notify_user(uid, "%s 匯率現在 %.4f ，大於你所設定的 %.4f" % (self.currency_name_mapping[currency], cur_value, value))
-            elif updown == 'down' and cur_value < value:
-                self.notify_user(uid, "%s 匯率現在 %.4f ，小於你所設定的 %.4f" % (self.currency_name_mapping[currency], cur_value, value))
 
     # ---- 更新匯率表 ----
     def update_exchange_rate_table(self):
@@ -57,6 +84,7 @@ class MyLineBot:
         self.exchange_rate_table = table
         self.table_update_timestamp = str(datetime.utcnow())+'(UTC)'
 
+        # ** 
         self.check_notify_list()
 
     # ---- 取得匯率表 ----
@@ -82,23 +110,32 @@ class MyLineBot:
         msg = msg.strip().replace(' ','')
         default_msg = "請輸入你想查詢的幣別（目前支援的有 %s）\n或請輸入你想被通知的幣別（範例1： 美元大於30通知我, 範例2： 日圓小於0.27通知我）" % (",".join(self.currency_name_mapping.values()))
 
-        # --- 通知功能 ----
-        if re.match(".*通知", msg):
-            match_obj = re.match("(\w+)(大於|小於)(\d+\.?\d*).*通知", msg)
-            if match_obj:
-                try:
-                    currency = self.inverse_currency_name_mapping[match_obj.group(1)]
-                    if match_obj.group(2) == "大於":
-                        updown = "up" 
-                    else:
-                        updown = "down"
-                    value = round(float(match_obj.group(3)), 4)
-                    self.add_request_to_notify_list(uid, currency, updown, value)
-                    return match_obj.group(0) + '你'
-                except Exception as e:
-                    traceback.print_exc()
-                    
-            return "請檢查你的格式（範例1： 美元大於30通知我, 範例2： 日圓小於0.27通知我）"
+        # --- ** 通知功能 ----
+        if re.match(".*通知", msg):  
+            # HERE! ->
+            #
+            # 將使用者的訊息 拆解成三個字串參數出來 ， 分別對應到 （currency, updown, value）
+            #
+            #    例如 "美元大於30通知我" -> (美元, 大於, 30)
+            #
+            # 也有可能發生使用者的參數拆解出來無意義的時候：
+            #
+            #    例如 "黃金大於30通知我" -> (黃金, 大於, 30)
+            #
+            #    例如 "美元30通知我" -> (美元, ?, 30)
+            #
+            # 試著想想如何處理以上這些問題
+            #
+            currency = ""
+            updown = ""
+            value = ""
+            #
+            # HERE! <-
+            if len(currency) > 0 and len(updown) > 0 and len(value) > 0:
+                self.add_request_to_notify_list(uid, currency, updown, value)
+                return "已確認，%s%s%s通知你" % (currency, updown, value)
+            else:
+                return "請檢查你的格式（範例1： 美元大於30通知我, 範例2： 日圓小於0.27通知我）"
 
         # --- 匯率查詢功能 ----
         for currency, name in self.currency_name_mapping.items():
@@ -110,7 +147,7 @@ class MyLineBot:
 
 if __name__ == "__main__":
 
-    bot = MyLineBot()
+    bot = MyLineBot({'exchange_rate_table':{'USD':35.5, 'JPY':0.29}})
 
     def msg_test(title, uid, msg, is_fail_pattern):
         print(title)
@@ -140,35 +177,26 @@ if __name__ == "__main__":
                 if msg_test("\n[3.驗證訊息 '美金' ] parse_message('美金')]", "","美金", False):
                     break
 
-                if msg_test("\n[4.驗證訊息 '美金大於30通知我' ] parse_message('美金大於30通知我')]", "USD_TEST_UID", "美金大於30通知我", False):
-                    break
+                msg_test("\n[4.驗證訊息 '黃金大於30通知我' ] parse_message('黃金大於30通知我')]", "abcd1234", "黃金大於30通知我", False)
+                bot.check_notify_list()
+                bot.get_notify_list()
 
-                if msg_test("\n[5.驗證訊息 '如果美元大於 30 通知我' ] parse_message('如果美元大於 30 通知我')]", "USD_TEST_UID", "如果美元大於 30 通知我", False):
-                    break
+                msg_test("\n[5.驗證訊息 '如果美元大於 30 通知我' ] parse_message('如果美元大於 30 通知我')]", "abcd1234", "如果美元大於 30 通知我", False)
+                bot.get_notify_list()
+                bot.check_notify_list()
 
-                if msg_test("\n[6.驗證訊息 '美元>30通知我' ] parse_message('美元>30通知我')]", "USD_TEST_UID", "美元>30通知我", False):
-                    break
+                msg_test("\n[7.驗證訊息 '美元大於 30塊 通知我' ] parse_message('美元大於 30塊 通知我')]", "abcd1234", "美元大於 30塊 通知我", True)
+                bot.get_notify_list()
+                bot.check_notify_list()
+                
+                msg_test("\n[8.驗證訊息 '美元大於40通知我' ] parse_message('美元大於40通知我')]", "abcd1234", "美元大於40通知我", True)
+                bot.get_notify_list()
+                bot.check_notify_list()
 
-                if msg_test("\n[7.驗證訊息 '美元大於 30塊 通知我' ] parse_message('美元大於 30塊 通知我')]", "USD_TEST_UID", "美元大於 30塊 通知我", True):
-                    break
+                msg_test("\n[9.驗證訊息 '美元大於 30 通知我' ] parse_message('美元大於 30 通知我')]", "abcd1234", "美元大於 30 通知我", True)
+                bot.get_notify_list()
+                bot.check_notify_list()
 
-                if msg_test("\n[8.驗證訊息 '美元大於30通知我' ] parse_message('美元大於30通知我')]", "USD_TEST_UID", "美元大於30通知我", True):
-                    break
-
-                if msg_test("\n[9.驗證訊息 '美元大於 30 通知我' ] parse_message('美元大於 30 通知我')]", "USD_TEST_UID", "美元大於 30 通知我", True):
-                    break
-
-                if msg_test("\n[10.驗證訊息 '日圓小於0.27通知我' ] parse_message('日圓小於0.27通知我')]", "JPY_TEST_UID", "日圓小於0.27通知我", True):
-                    break
-
-                print("\n[11.驗證更新匯率表] update_exchange_rate_table()")
-                bot.update_exchange_rate_table()
-                print(bot.get_table_update_timestamp(), bot.get_exchange_rate_table(), bot.get_notify_list())
-
-                if msg_test("\n[12.驗證訊息 '美元' ] parse_message('美元')]", "","美元", True):
-                    break
-
-                print("\n\n A L L  T E S T  P A S S \n\n")
                 break
 
             
